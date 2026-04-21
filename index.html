@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>10K Checkboxes</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0f0f13;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 48px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #7c3aed, #2563eb, #06b6d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+    }
+
+    header p {
+      margin-top: 6px;
+      font-size: 0.9rem;
+      color: #888;
+    }
+
+    #stats {
+      display: flex;
+      gap: 32px;
+      margin-bottom: 20px;
+      font-size: 0.85rem;
+      color: #aaa;
+    }
+
+    #stats span strong {
+      color: #e0e0e0;
+      font-size: 1rem;
+    }
+
+    #status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      background: #1a1a24;
+      border: 1px solid #2a2a3a;
+      transition: all 0.3s;
+    }
+
+    #status .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ef4444;
+      transition: background 0.3s;
+    }
+
+    #status.connected .dot { background: #22c55e; }
+    #status.connected { color: #86efac; border-color: #166534; }
+    #status.disconnected { color: #fca5a5; border-color: #7f1d1d; }
+
+    #grid-wrapper {
+      width: 100%;
+      max-width: 1100px;
+      background: #13131a;
+      border: 1px solid #1e1e2e;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 0 40px rgba(124, 58, 237, 0.08);
+    }
+
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
+      gap: 4px;
+    }
+
+    .cb-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cb-wrap input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border: 1.5px solid #2e2e42;
+      border-radius: 4px;
+      background: #1a1a28;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s, transform 0.1s, box-shadow 0.12s;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .cb-wrap input[type="checkbox"]:hover {
+      border-color: #7c3aed;
+      transform: scale(1.15);
+      box-shadow: 0 0 6px rgba(124, 58, 237, 0.5);
+    }
+
+    .cb-wrap input[type="checkbox"]:checked {
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      border-color: #7c3aed;
+      box-shadow: 0 0 8px rgba(124, 58, 237, 0.6);
+    }
+
+    .cb-wrap input[type="checkbox"]:checked::after {
+      content: '';
+      position: absolute;
+      left: 5px;
+      top: 2px;
+      width: 5px;
+      height: 9px;
+      border: 2px solid #fff;
+      border-top: none;
+      border-left: none;
+      transform: rotate(45deg);
+    }
+
+    .cb-wrap input[type="checkbox"].flash {
+      animation: flash-anim 0.35s ease;
+    }
+
+    @keyframes flash-anim {
+      0%   { box-shadow: 0 0 0px rgba(6, 182, 212, 0); }
+      50%  { box-shadow: 0 0 14px rgba(6, 182, 212, 0.9); }
+      100% { box-shadow: 0 0 0px rgba(6, 182, 212, 0); }
+    }
+
+    #progress-bar-wrap {
+      width: 100%;
+      max-width: 1100px;
+      margin-top: 16px;
+      background: #1a1a28;
+      border-radius: 999px;
+      height: 6px;
+      overflow: hidden;
+    }
+
+    #progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #7c3aed, #2563eb, #06b6d4);
+      border-radius: 999px;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    #pct-label {
+      margin-top: 6px;
+      font-size: 0.75rem;
+      color: #555;
+      text-align: right;
+      width: 100%;
+      max-width: 1100px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>10,000 Checkboxes</h1>
+  <p>Every checkbox is shared in real-time with everyone on the page.</p>
+</header>
+
+<div id="stats">
+  <span>Checked: <strong id="checked-count">0</strong></span>
+  <span>Unchecked: <strong id="unchecked-count">10000</strong></span>
+  <span>Connected: <strong id="user-count">—</strong></span>
+</div>
+
+<div id="status" class="disconnected">
+  <span class="dot"></span>
+  <span id="status-text">Connecting…</span>
+</div>
+
+<div id="grid-wrapper">
+  <div id="grid"></div>
+</div>
+
+<div id="progress-bar-wrap">
+  <div id="progress-bar"></div>
+</div>
+<div id="pct-label">0% checked</div>
+
+<script src="./script.js"></script>
+</body>
+</html>
