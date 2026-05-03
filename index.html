@@ -3,126 +3,316 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>10K Checkboxes</title>
+  <title>10k checkboxes</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      background: #0f0f13;
-      color: #e0e0e0;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 24px 16px 48px;
+    :root {
+      --bg:        #0b0b0f;
+      --bg2:       #0f0f14;
+      --border:    #1c1c24;
+      --muted:     #2e2e3d;
+      --dim:       #55556a;
+      --text:      #b8b8cc;
+      --bright:    #eeeef8;
+      --accent:    #7c6af7;
+      --accent2:   #4f9cf9;
+      --cb-idle-bg:     #1a1826;
+      --cb-idle-border: #3d3560;
+      --green:     #4ade80;
+      --red:       #f87171;
+      --sidebar-w: calc(100vw / 3);
     }
 
-    header {
-      text-align: center;
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      overflow: hidden;
+    }
+
+    /* ── Layout ── */
+    .layout {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-width: 260px;
+      max-width: 380px;
+      height: 100vh;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 40px 32px;
+      flex-shrink: 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* subtle top-left glow */
+    .sidebar::before {
+      content: '';
+      position: absolute;
+      top: -60px;
+      left: -60px;
+      width: 220px;
+      height: 220px;
+      background: radial-gradient(circle, rgba(124,106,247,0.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 40px;
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      border: 1.5px solid var(--accent);
+      border-radius: 6px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3px;
+      padding: 5px;
+    }
+
+    .logo-icon span {
+      background: var(--accent);
+      border-radius: 1px;
+      display: block;
+    }
+
+    .logo-icon span:nth-child(3) {
+      background: var(--accent2);
+    }
+
+    .logo-text {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--bright);
+      letter-spacing: -0.3px;
+    }
+
+    .logo-text sub {
+      font-size: 10px;
+      color: var(--dim);
+      font-weight: 400;
+      margin-left: 2px;
+    }
+
+    /* stat blocks */
+    .stat-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 32px;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--dim);
+      margin-bottom: 2px;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 600;
+      color: var(--bright);
+      line-height: 1;
+      letter-spacing: -1.5px;
+    }
+
+    .stat-value.accent { color: var(--accent); }
+    .stat-value.green  { color: var(--green); }
+
+    .stat-row {
+      display: flex;
+      gap: 24px;
+    }
+
+    .stat-item { flex: 1; }
+
+    /* progress */
+    .progress-wrap {
+      margin-bottom: 32px;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .progress-track {
+      height: 3px;
+      background: var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 999px;
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+
+    /* status pill */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      color: var(--dim);
+      margin-bottom: 32px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--red);
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+
+    .status-pill.connected .status-dot { background: var(--green); }
+    .status-pill.connected { color: var(--green); }
+    .status-pill.disconnected { color: var(--red); }
+
+    /* divider */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0 28px;
+    }
+
+    /* users online */
+    .online-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--dim);
+      margin-bottom: 28px;
+    }
+
+    .online-row .pulse {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      position: relative;
+    }
+
+    .online-row .pulse::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: 50%;
+      border: 1px solid var(--green);
+      opacity: 0.4;
+      animation: pulse-ring 2s ease infinite;
+    }
+
+    @keyframes pulse-ring {
+      0%   { transform: scale(0.8); opacity: 0.6; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+
+    .online-row strong { color: var(--text); }
+
+    /* footer */
+    .sidebar-footer {
+      margin-top: auto;
+      font-size: 10px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .sidebar-footer a {
+      color: var(--dim);
+      text-decoration: none;
+    }
+
+    .sidebar-footer a:hover { color: var(--text); }
+
+    /* ── Main / checkbox area ── */
+    .main {
+      flex: 1;
+      height: 100vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 40px 56px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .main::-webkit-scrollbar { width: 4px; }
+    .main::-webkit-scrollbar-track { background: transparent; }
+    .main::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
+
+    .grid-header {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
       margin-bottom: 24px;
     }
 
-    header h1 {
-      font-size: 2rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, #7c3aed, #2563eb, #06b6d4);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      letter-spacing: -0.5px;
-    }
-
-    header p {
-      margin-top: 6px;
-      font-size: 0.9rem;
-      color: #888;
-    }
-
-    #stats {
-      display: flex;
-      gap: 32px;
-      margin-bottom: 20px;
-      font-size: 0.85rem;
-      color: #aaa;
-    }
-
-    #stats span strong {
-      color: #e0e0e0;
-      font-size: 1rem;
-    }
-
-    #status {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.8rem;
-      padding: 4px 12px;
-      border-radius: 999px;
-      margin-bottom: 20px;
-      background: #1a1a24;
-      border: 1px solid #2a2a3a;
-      transition: all 0.3s;
-    }
-
-    #status .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #ef4444;
-      transition: background 0.3s;
-    }
-
-    #status.connected .dot { background: #22c55e; }
-    #status.connected { color: #86efac; border-color: #166534; }
-    #status.disconnected { color: #fca5a5; border-color: #7f1d1d; }
-
-    #grid-wrapper {
-      width: 100%;
-      max-width: 1100px;
-      background: #13131a;
-      border: 1px solid #1e1e2e;
-      border-radius: 12px;
-      padding: 16px;
-      box-shadow: 0 0 40px rgba(124, 58, 237, 0.08);
+    .grid-hint {
+      font-size: 10px;
+      color: var(--dim);
     }
 
     #grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
-      gap: 4px;
+      grid-template-columns: repeat(auto-fill, 24px);
+      gap: 5px;
     }
 
-    .cb-wrap {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
+    /* ── Checkboxes ── */
     .cb-wrap input[type="checkbox"] {
       appearance: none;
       -webkit-appearance: none;
       width: 20px;
       height: 20px;
-      border: 1.5px solid #2e2e42;
+      border: 1.5px solid var(--cb-idle-border);
       border-radius: 4px;
-      background: #1a1a28;
+      background: var(--cb-idle-bg);
       cursor: pointer;
-      transition: background 0.12s, border-color 0.12s, transform 0.1s, box-shadow 0.12s;
+      transition: border-color 0.12s, background 0.12s, transform 0.08s, box-shadow 0.12s;
       position: relative;
+      display: block;
       flex-shrink: 0;
     }
 
     .cb-wrap input[type="checkbox"]:hover {
-      border-color: #7c3aed;
-      transform: scale(1.15);
-      box-shadow: 0 0 6px rgba(124, 58, 237, 0.5);
+      border-color: var(--accent);
+      background: #221e3a;
+      transform: scale(1.18);
+      box-shadow: 0 0 0 2px rgba(124, 106, 247, 0.2), 0 0 8px rgba(124, 106, 247, 0.15);
     }
 
     .cb-wrap input[type="checkbox"]:checked {
-      background: linear-gradient(135deg, #7c3aed, #2563eb);
-      border-color: #7c3aed;
-      box-shadow: 0 0 8px rgba(124, 58, 237, 0.6);
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 0 6px rgba(124, 106, 247, 0.5);
     }
 
     .cb-wrap input[type="checkbox"]:checked::after {
@@ -132,77 +322,91 @@
       top: 2px;
       width: 5px;
       height: 9px;
-      border: 2px solid #fff;
+      border: 1.5px solid #fff;
       border-top: none;
       border-left: none;
       transform: rotate(45deg);
     }
 
     .cb-wrap input[type="checkbox"].flash {
-      animation: flash-anim 0.35s ease;
+      animation: flash-anim 0.4s ease;
     }
 
     @keyframes flash-anim {
-      0%   { box-shadow: 0 0 0px rgba(6, 182, 212, 0); }
-      50%  { box-shadow: 0 0 14px rgba(6, 182, 212, 0.9); }
-      100% { box-shadow: 0 0 0px rgba(6, 182, 212, 0); }
-    }
-
-    #progress-bar-wrap {
-      width: 100%;
-      max-width: 1100px;
-      margin-top: 16px;
-      background: #1a1a28;
-      border-radius: 999px;
-      height: 6px;
-      overflow: hidden;
-    }
-
-    #progress-bar {
-      height: 100%;
-      background: linear-gradient(90deg, #7c3aed, #2563eb, #06b6d4);
-      border-radius: 999px;
-      width: 0%;
-      transition: width 0.3s ease;
-    }
-
-    #pct-label {
-      margin-top: 6px;
-      font-size: 0.75rem;
-      color: #555;
-      text-align: right;
-      width: 100%;
-      max-width: 1100px;
+      0%   { box-shadow: 0 0 0px rgba(79, 156, 249, 0); }
+      40%  { box-shadow: 0 0 12px rgba(79, 156, 249, 0.85); }
+      100% { box-shadow: 0 0 0px rgba(79, 156, 249, 0); }
     }
   </style>
 </head>
 <body>
 
-<header>
-  <h1>10,000 Checkboxes</h1>
-  <p>Every checkbox is shared in real-time with everyone on the page.</p>
-</header>
+<div class="layout">
 
-<div id="stats">
-  <span>Checked: <strong id="checked-count">0</strong></span>
-  <span>Unchecked: <strong id="unchecked-count">10000</strong></span>
-  <span>Connected: <strong id="user-count">—</strong></span>
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+
+    <div class="sidebar-logo">
+      <div class="logo-icon">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div class="logo-text">checkboxes <sub>10k</sub></div>
+    </div>
+
+    <div class="stat-group">
+      <div class="stat-label">checked</div>
+      <div class="stat-value accent" id="checked-count">0</div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-item stat-group">
+        <div class="stat-label">remaining</div>
+        <div class="stat-value" id="unchecked-count">10000</div>
+      </div>
+      <div class="stat-item stat-group">
+        <div class="stat-label">total</div>
+        <div class="stat-value">10000</div>
+      </div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-header">
+        <span class="stat-label" style="margin:0">progress</span>
+        <span style="font-size:11px;color:var(--dim)" id="pct-label">0.0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-bar"></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="online-row">
+      <span class="pulse"></span>
+      <span><strong id="user-count">—</strong> online now</span>
+    </div>
+
+    <div id="status" class="status-pill disconnected">
+      <span class="status-dot"></span>
+      <span id="status-text">connecting…</span>
+    </div>
+    
+
+  </aside>
+
+  <!-- ── Checkbox grid ── -->
+  <main class="main">
+    <div class="grid-header">
+      <span class="stat-label">all checkboxes</span>
+      <span class="grid-hint">click any box — it updates for everyone</span>
+    </div>
+    <div id="grid"></div>
+  </main>
+
 </div>
 
-<div id="status" class="disconnected">
-  <span class="dot"></span>
-  <span id="status-text">Connecting…</span>
-</div>
-
-<div id="grid-wrapper">
-  <div id="grid"></div>
-</div>
-
-<div id="progress-bar-wrap">
-  <div id="progress-bar"></div>
-</div>
-<div id="pct-label">0% checked</div>
-
+<!-- Socket.io client — auto-served by the socket.io server -->
+<script src="/socket.io/socket.io.js"></script>
 <script src="./script.js"></script>
 </body>
 </html>

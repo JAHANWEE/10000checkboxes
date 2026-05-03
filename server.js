@@ -1,87 +1,128 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { WebSocketServer } = require("ws");
+const { Server } = require("socket.io");
+const Redis = require("ioredis");
 
-const TOTAL = 10000;
-// Bitset: 10000 bits = 1250 bytes
-const state = Buffer.alloc(Math.ceil(TOTAL / 8), 0);
+require("dotenv").config();
 
-function getBit(i) {
-  return (state[Math.floor(i / 8)] >> (7 - (i % 8))) & 1;
+const PORT      = process.env.PORT || 3000;
+const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
+const TOTAL      = 10000;
+const STATE_KEY  = "cb:state";       
+const PUB_CHAN   = "cb:updates";     
+
+const redisState = new Redis(REDIS_URL);
+const redisPub   = new Redis(REDIS_URL);
+const redisSub   = new Redis(REDIS_URL);
+
+redisState.on("error", (e) => console.error("[redis:state]", e.message));
+redisPub.on("error",   (e) => console.error("[redis:pub]",   e.message));
+redisSub.on("error",   (e) => console.error("[redis:sub]",   e.message));
+
+function getBit(buf, i) {
+  return (buf[Math.floor(i / 8)] >> (7 - (i % 8))) & 1;
 }
 
-function setBit(i, val) {
+function setBit(buf, i, val) {
   const byte = Math.floor(i / 8);
-  const bit = 7 - (i % 8);
-  if (val) {
-    state[byte] |= 1 << bit;
-  } else {
-    state[byte] &= ~(1 << bit);
-  }
+  const bit  = 7 - (i % 8);
+  if (val) buf[byte] |=  (1 << bit);
+  else     buf[byte] &= ~(1 << bit);
+}
+
+async function loadState() {
+  const raw = await redisState.getBuffer(STATE_KEY);
+  if (raw && raw.length === Math.ceil(TOTAL / 8)) return raw;
+  const blank = Buffer.alloc(Math.ceil(TOTAL / 8), 0);
+  await redisState.set(STATE_KEY, blank);
+  return blank;
+}
+
+async function persistBit(index, value) {
+  await redisState.setbit(STATE_KEY, index, value);
 }
 
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
 
-// HTTP server — serves static files
 const httpServer = http.createServer((req, res) => {
   let filePath = req.url === "/" ? "/index.html" : req.url;
-  const ext = path.extname(filePath);
+  
+  filePath = filePath.split("?")[0].split("#")[0];
+  const ext         = path.extname(filePath);
   const contentType = MIME[ext] || "text/plain";
-  const file = path.join(__dirname, filePath);
+  const file        = path.join(__dirname, filePath);
 
   fs.readFile(file, (err, data) => {
-    if (err) {
-      res.writeHead(404);
-      res.end("Not found");
-      return;
-    }
+    if (err) { res.writeHead(404); res.end("Not found"); return; }
     res.writeHead(200, { "Content-Type": contentType });
     res.end(data);
   });
 });
 
-const wss = new WebSocketServer({ server: httpServer });
+const io = new Server(httpServer, {
+  cors: { origin: "*" },          
+  transports: ["websocket", "polling"],
+});
 
-function broadcastUserCount() {
-  const count = wss.clients.size;
-  const msg = JSON.stringify({ type: "users", count });
-  wss.clients.forEach((c) => { if (c.readyState === 1) c.send(msg); });
-}
+(async () => {
+  const stateBuffer = await loadState();
+  console.log(`[boot] state loaded (${stateBuffer.length} bytes)`);
 
-wss.on("connection", (ws) => {
-  // Send full state on connect
-  ws.send(JSON.stringify({ type: "init", state: state.toString("base64") }));
-  broadcastUserCount();
+  await redisSub.subscribe(PUB_CHAN);
 
-  ws.on("close", () => broadcastUserCount());
-
-  ws.on("message", (raw) => {
+  redisSub.on("message", (_channel, message) => {
     let msg;
-    try {
-      msg = JSON.parse(raw);
-    } catch {
-      return;
+    try { msg = JSON.parse(message); } catch { return; }
+
+    if (msg.type === "update") {
+      setBit(stateBuffer, msg.index, msg.value);
+      io.emit("update", { index: msg.index, value: msg.value });
     }
 
-    if (msg.type === "toggle" && typeof msg.index === "number") {
-      const i = msg.index;
-      if (i < 0 || i >= TOTAL) return;
-      const newVal = getBit(i) ? 0 : 1;
-      setBit(i, newVal);
-
-      // Broadcast to all clients
-      const broadcast = JSON.stringify({ type: "update", index: i, value: newVal });
-      wss.clients.forEach((client) => {
-        if (client.readyState === 1) {
-          client.send(broadcast);
-        }
-      });
+    if (msg.type === "users") {
+      io.emit("users", { count: msg.count });
     }
   });
-});
+  const USERS_KEY = "cb:users";
 
-const PORT = 3000;
-httpServer.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+  async function userJoined() {
+    const count = await redisState.incr(USERS_KEY);
+    await redisPub.publish(PUB_CHAN, JSON.stringify({ type: "users", count }));
+  }
+
+  async function userLeft() {
+    const count = await redisState.decr(USERS_KEY);
+    const safe  = Math.max(0, count);
+    if (safe !== count) await redisState.set(USERS_KEY, 0);
+    await redisPub.publish(PUB_CHAN, JSON.stringify({ type: "users", count: safe }));
+  }
+
+  io.on("connection", async (socket) => {
+    socket.emit("init", { state: stateBuffer.toString("base64") });
+    await userJoined();
+
+    socket.on("toggle", async ({ index }) => {
+      if (typeof index !== "number" || index < 0 || index >= TOTAL) return;
+
+      const current = await redisState.getbit(STATE_KEY, index);
+      const newVal  = current ? 0 : 1;
+      await persistBit(index, newVal);
+
+      setBit(stateBuffer, index, newVal);
+
+      await redisPub.publish(
+        PUB_CHAN,
+        JSON.stringify({ type: "update", index, value: newVal })
+      );
+    });
+
+    socket.on("disconnect", async () => {
+      await userLeft();
+    });
+  });
+
+  httpServer.listen(PORT, () => {
+    console.log(`[server] listening on http://localhost:${PORT}`);
+  });
+})();

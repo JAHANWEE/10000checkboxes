@@ -1,59 +1,110 @@
 # 10,000 Checkboxes
 
-A real-time collaborative checkbox grid inspired by [One Million Checkboxes](https://eieio.games/blog/scaling-one-million-checkboxes/). Every checkbox is synchronized across all connected users via WebSockets.
+A real-time collaborative checkbox grid inspired by [One Million Checkboxes]. Every checkbox is shared live across all connected users. Built to scale horizontally — multiple server instances stay in sync via Redis pub/sub.
+
+**Live link** tenk-checkbox.jahanwee.tech
 
 ## Features
 
-- **10,000 shared checkboxes** — check or uncheck any box, and it updates for everyone instantly
-- **Real-time WebSocket sync** — all changes broadcast to connected clients
-- **Efficient bitset storage** — server stores state in just 1,250 bytes
-- **Live stats** — see checked/unchecked counts, progress bar, and connected users
-- **Smooth animations** — flash effect when remote users toggle checkboxes
-- **Auto-reconnect** — client automatically reconnects if connection drops
+- 10,000 shared checkboxes — toggle one, everyone sees it instantly
+- Socket.io for real-time bidirectional communication
+- Redis (or Valkey) pub/sub — multiple server instances stay in sync
+- Bitset state storage — 10,000 checkbox states packed into 1,250 bytes in Redis
+- Live stats — checked count, progress bar, global online user count
+- Flash animation when a remote user toggles a checkbox
+- Auto-reconnect on connection drop
 
 ## Tech Stack
 
-- **HTML/CSS/JS** — pure vanilla frontend, no frameworks
-- **Node.js** — HTTP server and WebSocket server
-- **ws** — WebSocket library for Node.js
-- **Bitset** — efficient binary state storage using Node.js Buffer
+| Layer | Technology |
+|---|---|
+| Frontend | Vanilla HTML / CSS / JS |
+| Realtime | Socket.io v4 |
+| Backend | Node.js (no framework) |
+| State + Sync | Redis / Valkey (ioredis) |
+| Deploy | Render |
 
-## Installation
+## Local Development
+
+### Prerequisites
+
+- Node.js 18+
+- Docker (for local Redis/Valkey)
+
+### 1. Clone and install
 
 ```bash
+git clone https://github.com/JAHANWEE/10000checkboxes.git
+cd 10000checkboxes
 npm install
 ```
 
-## Usage
+### 2. Start Valkey (Redis-compatible) via Docker
 
-Start the server:
+```bash
+docker compose up -d
+```
+
+This starts a Valkey instance on `localhost:6379`.
+
+### 3. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+The default `.env` points to the local Docker instance — no changes needed for local dev.
+
+### 4. Start the server
 
 ```bash
 npm start
 ```
 
-Then open your browser to:
+Open `http://localhost:3000`. Open multiple tabs to see real-time sync in action.
+
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `3000` | Port the HTTP + Socket.io server listens on |
+| `REDIS_URL` | `redis://localhost:6379` | Redis / Valkey connection URL |
+
+For Render's internal Redis, use the **Internal Database URL** (e.g. `redis://red-xxxx:6379`).
+For external connections (local → Render Redis), use the **External Database URL** with `rediss://` (TLS).
+
+## Project Structure
 
 ```
-http://localhost:3000
+.
+├── server.js          # Node.js HTTP + Socket.io server, Redis pub/sub
+├── script.js          # Browser-side Socket.io client
+├── index.html         # UI — sidebar + checkbox grid
+├── docker-compose.yml # Local Valkey (Redis-compatible) for development
+├── render.yaml        # Render IaC — web service + Redis definition
+├── .env.example       # Environment variable template
+└── package.json
 ```
-
-Open multiple tabs or share with friends to see real-time synchronization in action!
 
 ## How It Works
 
-The server maintains checkbox state as a bitset (10,000 bits = 1,250 bytes). When a client toggles a checkbox:
+```
+Browser clicks checkbox
+        ↓
+socket.emit("toggle", { index })
+        ↓
+Server receives toggle
+        ↓
+Redis SETBIT (atomic flip)
+        ↓
+redisPub.publish("cb:updates", { type:"update", index, value })
+        ↓
+All server instances receive via redisSub
+        ↓
+Each instance: io.emit("update", ...) → all connected browsers update
+```
 
-1. Client sends `{ type: "toggle", index: N }` via WebSocket
-2. Server flips the bit at index N
-3. Server broadcasts `{ type: "update", index: N, value: 0|1 }` to all clients
-4. All clients update their checkbox and play a flash animation
-
-On initial connection, the server sends the full bitset as base64, and the client decodes it to initialize all 10,000 checkboxes.
-
-## Inspiration
-
-This project was inspired by Nolen Royalty's viral [One Million Checkboxes](https://eieio.games/blog/scaling-one-million-checkboxes/) experiment, which handled 650 million checkbox toggles from thousands of concurrent users. Content was rephrased for compliance with licensing restrictions.
+State is stored as a Redis bitset — 10,000 bits = 1,250 bytes. On connect, the server reads the full bitset, base64-encodes it, and sends it to the new client in a single `init` event.
 
 ## License
 
