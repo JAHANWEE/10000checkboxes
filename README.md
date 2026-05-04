@@ -2,7 +2,10 @@
 
 A real-time collaborative checkbox grid inspired by [One Million Checkboxes]. Every checkbox is shared live across all connected users. Built to scale horizontally — multiple server instances stay in sync via Redis pub/sub.
 
-**Live link** https://one0kcheckboxes.onrender.com/
+
+**Live link** https://one0kcheckboxes.onrender.com/ 
+
+**Demo Link** https://youtu.be/cx_2VtopaEY
 
 ## Features
 
